@@ -52,3 +52,31 @@ export function formatChunksForPrompt(chunks: RetrievedChunk[]): string {
     })
     .join("\n\n");
 }
+
+/**
+ * Convierte los índices que el LLM devolvió en `fuentes_citadas` (base 1) en
+ * un bloque legible para WhatsApp. Deduplica por (source, document_title) para
+ * no repetir la misma fuente si dos chunks vinieron del mismo documento.
+ *
+ * Devuelve string vacío si no hay índices válidos.
+ */
+export function formatCitedSources(
+  chunks: RetrievedChunk[],
+  citedIndexes: number[],
+): string {
+  if (chunks.length === 0 || citedIndexes.length === 0) return "";
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const idx of citedIndexes) {
+    const chunk = chunks[idx - 1];
+    if (!chunk) continue;
+    const title = chunk.document_title?.trim() || chunk.section_title?.trim() || null;
+    const key = `${chunk.source}::${title ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = title ? `${chunk.source} — ${title}` : chunk.source;
+    lines.push(chunk.url ? `• ${label} (${chunk.url})` : `• ${label}`);
+  }
+  if (lines.length === 0) return "";
+  return `📚 Fuentes:\n${lines.join("\n")}`;
+}

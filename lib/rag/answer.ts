@@ -3,7 +3,12 @@ import { z } from "zod";
 import { chatModel, assertAiProviderEnv } from "../ai/gateway";
 import { bloqueDerivacion } from "../triage/derivaciones";
 import { runTriageRules, type Severity } from "../triage/rules";
-import { formatChunksForPrompt, retrieve, type RetrievedChunk } from "./retrieve";
+import {
+  formatChunksForPrompt,
+  formatCitedSources,
+  retrieve,
+  type RetrievedChunk,
+} from "./retrieve";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt";
 
 const AnswerSchema = z.object({
@@ -86,9 +91,12 @@ export async function answer(message: string): Promise<AnswerResult> {
 
   const obj = result.output;
 
-  const finalRespuesta = obj.requiere_derivacion
-    ? `${obj.respuesta}\n\n${bloqueDerivacion()}`
-    : obj.respuesta;
+  const citas = formatCitedSources(chunks, obj.fuentes_citadas);
+
+  const partes = [obj.respuesta];
+  if (citas) partes.push(citas);
+  if (obj.requiere_derivacion) partes.push(bloqueDerivacion());
+  const finalRespuesta = partes.join("\n\n");
 
   return {
     respuesta: finalRespuesta,

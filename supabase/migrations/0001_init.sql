@@ -18,7 +18,7 @@ create table if not exists public.documents (
   url           text,
   page          int,
   metadata      jsonb not null default '{}'::jsonb,
-  embedding     vector(768),
+  embedding     vector(1536),
   created_at    timestamptz not null default now()
 );
 
@@ -88,7 +88,7 @@ create index if not exists messages_log_inbound_idx
 -- Función: búsqueda semántica top-k con filtro por score
 -- ---------------------------------------------------------------------
 create or replace function public.match_documents(
-  query_embedding vector(768),
+  query_embedding vector(1536),
   match_count     int default 5,
   min_score       float default 0.5
 )
