@@ -1,25 +1,45 @@
-import { gateway } from "ai";
-
-export const CHAT_MODEL_ID =
-  process.env.AI_GATEWAY_CHAT_MODEL ?? "openai/gpt-5.4";
-
-export const EMBED_MODEL_ID =
-  process.env.AI_GATEWAY_EMBED_MODEL ?? "openai/text-embedding-3-small";
-
-export const EMBED_DIMENSIONS = 1536;
-
-export const chatModel = CHAT_MODEL_ID;
-export const embeddingModel = gateway.textEmbeddingModel(EMBED_MODEL_ID);
+import { google } from "@ai-sdk/google";
 
 /**
- * En Vercel con AI Gateway habilitado, la autenticación usa OIDC y no requiere
- * `AI_GATEWAY_API_KEY`. En desarrollo local (o fuera de Vercel) sí es necesario.
+ * Proveedor: Google Generative AI (Gemini) — free tier sin tarjeta de crédito.
+ * Obtén tu key en https://aistudio.google.com/apikey y ponla en
+ * `GOOGLE_GENERATIVE_AI_API_KEY` (variable estándar del provider).
  */
-export function assertAiGatewayEnv(): void {
-  const onVercel = !!process.env.VERCEL;
-  if (!onVercel && !process.env.AI_GATEWAY_API_KEY) {
+
+export const CHAT_MODEL_ID = process.env.CHAT_MODEL ?? "gemini-2.0-flash";
+
+export const EMBED_MODEL_ID = process.env.EMBED_MODEL ?? "gemini-embedding-001";
+
+/** Dimensiones que pedimos al modelo. Debe coincidir con `vector(N)` en la DB. */
+export const EMBED_DIMENSIONS = 768;
+
+export const chatModel = google(CHAT_MODEL_ID);
+export const embeddingModel = google.embedding(EMBED_MODEL_ID);
+
+/**
+ * Opciones que se pasan al provider al embeber un chunk del corpus.
+ * `RETRIEVAL_DOCUMENT` produce embeddings asimétricos optimizados para que
+ * sean recuperados por una consulta tipo `RETRIEVAL_QUERY`.
+ */
+export const EMBED_DOC_PROVIDER_OPTS = {
+  google: {
+    outputDimensionality: EMBED_DIMENSIONS,
+    taskType: "RETRIEVAL_DOCUMENT" as const,
+  },
+};
+
+/** Opciones para embeber la pregunta del usuario en tiempo de búsqueda. */
+export const EMBED_QUERY_PROVIDER_OPTS = {
+  google: {
+    outputDimensionality: EMBED_DIMENSIONS,
+    taskType: "RETRIEVAL_QUERY" as const,
+  },
+};
+
+export function assertAiProviderEnv(): void {
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     throw new Error(
-      "AI_GATEWAY_API_KEY no está definido. En local debes proveerlo; en Vercel se autentica vía OIDC.",
+      "GOOGLE_GENERATIVE_AI_API_KEY no está definido. Crea una key en https://aistudio.google.com/apikey",
     );
   }
 }

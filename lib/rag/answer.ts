@@ -1,6 +1,6 @@
 import { Output, generateText } from "ai";
 import { z } from "zod";
-import { chatModel, assertAiGatewayEnv } from "../ai/gateway";
+import { chatModel, assertAiProviderEnv } from "../ai/gateway";
 import { bloqueDerivacion } from "../triage/derivaciones";
 import { runTriageRules, type Severity } from "../triage/rules";
 import { formatChunksForPrompt, retrieve, type RetrievedChunk } from "./retrieve";
@@ -47,7 +47,7 @@ const RESPUESTA_RIESGO_INMEDIATO =
   "Lamento mucho que estés pasando por esto. No estás solo/a y existe ayuda disponible y gratuita ahora mismo. Por favor, contacta a una de estas líneas — son confidenciales y atendidas por profesionales:";
 
 export async function answer(message: string): Promise<AnswerResult> {
-  assertAiGatewayEnv();
+  assertAiProviderEnv();
 
   const triage = runTriageRules(message);
 

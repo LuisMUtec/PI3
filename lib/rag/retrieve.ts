@@ -1,5 +1,8 @@
 import { embed } from "ai";
-import { embeddingModel } from "../ai/gateway";
+import {
+  EMBED_QUERY_PROVIDER_OPTS,
+  embeddingModel,
+} from "../ai/gateway";
 import { getServerSupabase } from "../supabase/server";
 
 export type RetrievedChunk = {
@@ -21,6 +24,7 @@ export async function retrieve(query: string): Promise<RetrievedChunk[]> {
   const { embedding } = await embed({
     model: embeddingModel,
     value: query,
+    providerOptions: EMBED_QUERY_PROVIDER_OPTS,
   });
 
   const supabase = getServerSupabase();

@@ -9,7 +9,11 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { embedMany } from "ai";
 import { extractText, getDocumentProxy } from "unpdf";
-import { embeddingModel, assertAiGatewayEnv } from "../lib/ai/gateway";
+import {
+  EMBED_DOC_PROVIDER_OPTS,
+  assertAiProviderEnv,
+  embeddingModel,
+} from "../lib/ai/gateway";
 import { chunkText } from "../lib/rag/chunk";
 import { getServerSupabase } from "../lib/supabase/server";
 
@@ -32,7 +36,7 @@ const CORPUS_DIR = join(process.cwd(), "corpus");
 const BATCH_SIZE = 32;
 
 async function main() {
-  assertAiGatewayEnv();
+  assertAiProviderEnv();
   const supabase = getServerSupabase();
   const reset = process.argv.includes("--reset");
 
@@ -60,6 +64,7 @@ async function main() {
       const { embeddings } = await embedMany({
         model: embeddingModel,
         values: batch.map((c) => c.content),
+        providerOptions: EMBED_DOC_PROVIDER_OPTS,
       });
 
       const rows = batch.map((c, j) => ({
