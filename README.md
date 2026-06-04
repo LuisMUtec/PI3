@@ -23,14 +23,17 @@ Joel Cayllahua · Abel Escobar · Piero Pilco · Leonardo Montoya · Luis Maquer
 |---|---|
 | Canal | WhatsApp Sandbox de Twilio |
 | Backend | Next.js 16 (App Router, `after()`) |
-| LLM / embeddings | **GitHub Models** (`openai/gpt-4o-mini` + `text-embedding-3-small`) vía AI SDK v6 |
+| LLM / embeddings | **Vercel AI Gateway** (`google/gemini-2.5-flash-lite` + `openai/text-embedding-3-small`) vía AI SDK v6 |
 | Vector store | Supabase Postgres + pgvector (HNSW) |
 | Túnel local | ngrok |
 | Idioma | Español (variante peruana) |
 
-GitHub Models es OpenAI-compatible y **gratis con GitHub Student Pack**, por lo
-que no se requiere tarjeta de crédito. Endpoint usado:
-`https://models.github.ai/inference`.
+Vercel AI Gateway es una sola API para 100+ modelos con routing, failover y
+observabilidad; cada equipo Vercel incluye créditos gratis mensuales y cobra los
+tokens a precio de lista sin recargo. El chat usa el modelo de texto de Google
+más barato con Structured Outputs fiable (`google/gemini-2.5-flash-lite`) y los
+embeddings siguen en `openai/text-embedding-3-small` (1536 dims) para reusar el
+mismo espacio vectorial sin re-ingestar el corpus.
 
 ## Arquitectura
 
@@ -65,7 +68,7 @@ que no se requiere tarjeta de crédito. Endpoint usado:
 - **Node.js 20 LTS** (Node 22 también funciona).
 - **pnpm 10** (`npm install -g pnpm@10`). Con Node 20 *no uses pnpm 11+*.
 - **ngrok 3** ([descarga](https://ngrok.com/download)) con cuenta gratuita.
-- **GitHub Student Pack** activo (te da acceso gratuito a GitHub Models).
+- Cuenta de **Vercel** con **AI Gateway** habilitado (incluye créditos gratis mensuales; sin tarjeta para empezar).
 - Cuenta gratis de **Twilio** + WhatsApp Sandbox activado.
 - Proyecto **Supabase** gratuito (Free tier es suficiente).
 
@@ -83,14 +86,15 @@ pnpm install
 
 ### 2. Crear las credenciales externas
 
-#### a) GitHub Models (gratis con Student Pack)
+#### a) Vercel AI Gateway
 
-1. Activa tu Student Pack: <https://education.github.com/pack>
-2. Crea un **fine-grained Personal Access Token** en
-   <https://github.com/settings/personal-access-tokens/new>
-3. En **"Account permissions"** activa **`Models → Read-only`** (NO confundir
-   con el permiso por repositorio).
-4. Copia el token (`github_pat_...`).
+1. Crea (o entra a) una cuenta en <https://vercel.com>.
+2. En el dashboard de tu proyecto/equipo abre **AI Gateway** y habilítalo.
+3. Crea una **API Key** del AI Gateway (empieza con `vck_...`) y cópiala.
+4. Pégala en `.env.local` como `AI_GATEWAY_API_KEY`.
+
+> Alternativa sin clave manual: si despliegas en Vercel, `vercel env pull`
+> inyecta un `VERCEL_OIDC_TOKEN` de corta duración y no necesitas API key.
 
 #### b) Twilio WhatsApp Sandbox
 
@@ -141,10 +145,10 @@ TWILIO_ACCOUNT_SID=AC********************************
 TWILIO_AUTH_TOKEN=********************************
 TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 
-# GitHub Models
-GITHUB_TOKEN=github_pat_***
-CHAT_MODEL=openai/gpt-4o-mini
-EMBED_MODEL=openai/text-embedding-3-small
+# Vercel AI Gateway
+AI_GATEWAY_API_KEY=vck_***
+AI_GATEWAY_CHAT_MODEL=google/gemini-2.5-flash-lite
+AI_GATEWAY_EMBED_MODEL=openai/text-embedding-3-small
 
 # Supabase
 SUPABASE_URL=https://<project-ref>.supabase.co
@@ -287,7 +291,7 @@ eval/
   golden.jsonl            ← 32 casos (info, ambiguos, críticos, off-topic)
   run.ts                  ← runner de evaluación
 lib/
-  ai/gateway.ts           ← provider GitHub Models (chat + embeddings)
+  ai/gateway.ts           ← provider Vercel AI Gateway (chat + embeddings)
   anon/hash.ts            ← SHA-256(salt + ":" + phone)
   rag/
     chunk.ts              ← splitter recursivo (600 tok / 120 overlap)
@@ -315,7 +319,7 @@ proxy.ts                  ← Basic Auth para /dashboard (Next 16)
 | Respuesta asíncrona (`after()`) | Evita el timeout de 15s del webhook Twilio en redes rurales. |
 | Triaje en dos capas (reglas + LLM) | Reglas deterministas capturan casos críticos sin gastar tokens; auditables para sustentación. |
 | Una sola llamada LLM por consulta | `generateText` con `Output.object()` retorna respuesta + clasificación + tag en un round-trip. |
-| Structured Outputs (`json_schema`) | Azure OpenAI Foundry (donde corre GitHub Models) exige `json` en `json_object`; `json_schema` evita esa restricción y valida contra Zod. |
+| Structured Outputs (`Output.object`) | `gemini-2.5-flash-lite` soporta JSON Schema nativo; el AI SDK valida la salida contra el schema Zod en un solo round-trip. |
 | Sin historial multi-turno en MVP | Mensajes independientes evitan persistir contenido; reduce riesgo legal y simplifica. |
 | Hash anónimo con sal | Permite contar conversaciones únicas sin almacenar identidad (cumple Ley 29733). |
 | `proxy.ts` (no `middleware.ts`) | Convención Next.js 16. |
@@ -361,8 +365,8 @@ Disponible en `http://localhost:3000/dashboard` (Basic Auth con
 | Webhook responde 200 pero no llega WhatsApp | Error 63007 en logs. | `TWILIO_WHATSAPP_FROM` no es el del sandbox. Debe ser `whatsapp:+14155238886`. |
 | Respuesta sin bloque `📚 Fuentes` | `num_chunks: 0`. | Bajar `RAG_MIN_SCORE` (0.30 funciona con el corpus seed) o ampliar corpus. |
 | `pnpm install` falla con `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` | pnpm 11 + Node 20. | `npm i -g pnpm@10` o sube a Node 22. |
-| GitHub Models 401 / "No access to model" | PAT sin scope `models:read`. | Recrea el PAT en *fine-grained* con **Account permissions → Models → Read-only**. |
-| GitHub Models error `"messages must contain word 'json'"` | Provider en modo `json_object`. | Confirma que `lib/ai/gateway.ts` tiene `supportsStructuredOutputs: true`. |
+| AI Gateway 401 `authentication_error` | `AI_GATEWAY_API_KEY` inválida, revocada o sin acceso al Gateway. | Recrea la API Key en el dashboard de Vercel → AI Gateway, o usa `vercel env pull` para un `VERCEL_OIDC_TOKEN`. |
+| AI Gateway 402 `Payment Required` | Créditos del Gateway agotados. | Recarga créditos o configura auto top-up en el dashboard de Vercel. |
 | Supabase realtime falla en Node 20 | Falta WebSocket global. | El polyfill ya está en `lib/supabase/server.ts`; reinstala con `pnpm install`. |
 | ngrok cambia de URL en cada reinicio | Plan Free. | Reservar dominio en ngrok dashboard (gratis) o resincronizar `PUBLIC_BASE_URL` + webhook cada vez. |
 
