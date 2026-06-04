@@ -1,18 +1,20 @@
 import { MessageCircleHeart } from "lucide-react";
 import { WhatsappCta } from "./whatsapp-cta";
 
+// Enlaces relativos a la raíz (`/#...`) para que funcionen tanto en la landing
+// (scroll suave en la misma página) como desde subpáginas como /arquitectura.
 const navLinks = [
-  { href: "#como-funciona", label: "Cómo funciona" },
-  { href: "#temas", label: "Temas" },
-  { href: "#ayuda", label: "Ayuda urgente" },
-  { href: "#preguntas", label: "Preguntas" },
+  { href: "/#como-funciona", label: "Cómo funciona" },
+  { href: "/#temas", label: "Temas" },
+  { href: "/#ayuda", label: "Ayuda urgente" },
+  { href: "/#preguntas", label: "Preguntas" },
 ];
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-5 sm:px-6">
-        <a href="#inicio" className="flex items-center gap-2">
+        <a href="/#inicio" className="flex items-center gap-2">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <MessageCircleHeart className="size-5" />
           </span>
