@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import type { NextRequest } from "next/server";
 import { anonHash } from "@/lib/anon/hash";
+import { PRIVACY_WELCOME } from "@/lib/copy/privacy";
 import { answer } from "@/lib/rag/answer";
 import {
   forgetConversation,
@@ -18,11 +19,10 @@ export const maxDuration = 60;
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>';
 
-const WELCOME =
-  "Hola 👋. Canal *anónimo y gratuito* para dudas de salud sexual y reproductiva. " +
-  "No guardamos tu número (solo un código anónimo); recuerdo nuestra conversación un rato para darte " +
-  "continuidad y se borra sola tras unas horas de inactividad. Escribe *SALIR* para terminar y borrarla. " +
-  "Recuerda: soy una orientación informativa, no reemplazo a un profesional de salud.";
+// Copy de privacidad: único punto de verdad en lib/copy/privacy.ts (honesto
+// sobre las dos capas: anónimo frente a nosotros, NO frente a Twilio/Meta) y
+// sobre la memoria conversacional (se guarda un rato y se borra con SALIR).
+const WELCOME = PRIVACY_WELCOME;
 
 const FAREWELL =
   "Gracias por escribir. Si necesitas ayuda urgente, llama a la *Línea 100* (100) o acude al Centro de Salud más cercano. Cuídate.";
