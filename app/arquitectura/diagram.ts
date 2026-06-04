@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+// Diagrama de arquitectura (flujo end-to-end de un mensaje de WhatsApp).
+// HTML autocontenido con CSS inline; se sirve tal cual desde app/arquitectura/route.ts.
+export const DIAGRAM_HTML = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
@@ -378,3 +380,4 @@
 </div>
 </body>
 </html>
+`;
