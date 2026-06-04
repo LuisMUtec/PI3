@@ -7,6 +7,9 @@ import { sendWhatsApp, validateTwilioSignature } from "@/lib/whatsapp/twilio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// El trabajo pesado corre en after() (pipeline RAG + envío a Twilio); damos
+// margen para que la función siga viva tras responder 200 OK.
+export const maxDuration = 60;
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>';
 
