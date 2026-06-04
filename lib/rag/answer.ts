@@ -9,6 +9,11 @@ import {
   retrieve,
   type RetrievedChunk,
 } from "./retrieve";
+import {
+  formatHistoryForPrompt,
+  lastUserTurn,
+  type ConversationTurn,
+} from "./memory";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt";
 
 const AnswerSchema = z.object({
@@ -72,9 +77,18 @@ function ensamblarRespuesta(
   return `${cuerpo}${cola}`.trimStart();
 }
 
-export async function answer(message: string): Promise<AnswerResult> {
+export type AnswerOptions = {
+  /** Ventana reciente de la conversación (orden cronológico) para dar memoria. */
+  history?: ConversationTurn[];
+};
+
+export async function answer(
+  message: string,
+  opts: AnswerOptions = {},
+): Promise<AnswerResult> {
   assertAiProviderEnv();
 
+  const history = opts.history ?? [];
   const triage = runTriageRules(message);
 
   // Atajo determinista: si una regla detectó riesgo crítico, respondemos sin
@@ -92,7 +106,15 @@ export async function answer(message: string): Promise<AnswerResult> {
     };
   }
 
-  const chunks = await retrieve(message);
+  // Contextualiza la recuperación con el último turno del usuario para que las
+  // preguntas de seguimiento ("¿y los efectos?") recuperen los chunks correctos.
+  // Mantenemos una sola llamada al LLM (sin reescritura de consulta) para no
+  // sumar latencia ni costo; el mensaje actual sigue dominando la consulta.
+  const prevUserTurn = lastUserTurn(history);
+  const retrievalQuery = prevUserTurn
+    ? `${prevUserTurn}\n${message}`
+    : message;
+  const chunks = await retrieve(retrievalQuery);
   const contextBlock = formatChunksForPrompt(chunks);
 
   const result = await generateText({
@@ -102,6 +124,7 @@ export async function answer(message: string): Promise<AnswerResult> {
     prompt: buildUserPrompt({
       question: message,
       contextBlock,
+      historyBlock: formatHistoryForPrompt(history),
       triageHint:
         triage.category !== "ninguna"
           ? `posible ${triage.category} (severidad reglas=${triage.severity})`

@@ -297,7 +297,8 @@ lib/
     chunk.ts              ← splitter recursivo (600 tok / 120 overlap)
     retrieve.ts           ← embed query + match_documents + formato citas
     prompt.ts             ← system prompt + guardrails
-    answer.ts             ← orquestador: triage → retrieve → generateText
+    memory.ts             ← ventana conversacional efímera por hash anónimo
+    answer.ts             ← orquestador: recall → triage → retrieve → generateText
   supabase/server.ts      ← cliente service-role + polyfill WS
   triage/
     rules.ts              ← regex PE: ideación suicida, abuso, estupro…
@@ -307,6 +308,7 @@ scripts/
   ingest.ts               ← pipeline PDF→MD→chunk→embed→insert
   probe-answer.ts         ← debug del pipeline sin WhatsApp
 supabase/migrations/0001_init.sql
+supabase/migrations/0002_conversation_memory.sql  ← tabla + RPC de memoria
 proxy.ts                  ← Basic Auth para /dashboard (Next 16)
 ```
 
@@ -320,7 +322,7 @@ proxy.ts                  ← Basic Auth para /dashboard (Next 16)
 | Triaje en dos capas (reglas + LLM) | Reglas deterministas capturan casos críticos sin gastar tokens; auditables para sustentación. |
 | Una sola llamada LLM por consulta | `generateText` con `Output.object()` retorna respuesta + clasificación + tag en un round-trip. |
 | Structured Outputs (`Output.object`) | `gemini-2.5-flash-lite` soporta JSON Schema nativo; el AI SDK valida la salida contra el schema Zod en un solo round-trip. |
-| Sin historial multi-turno en MVP | Mensajes independientes evitan persistir contenido; reduce riesgo legal y simplifica. |
+| Memoria conversacional efímera | Ventana corta de turnos por hash anónimo: caduca por inactividad (6 h) y se borra con `SALIR`. Da continuidad a seguimientos sin retención indefinida. |
 | Hash anónimo con sal | Permite contar conversaciones únicas sin almacenar identidad (cumple Ley 29733). |
 | `proxy.ts` (no `middleware.ts`) | Convención Next.js 16. |
 | `RAG_MIN_SCORE=0.30` | Con 15 chunks los scores oscilan 0.30–0.40; umbral más alto deja al modelo sin contexto. |
@@ -330,8 +332,12 @@ proxy.ts                  ← Basic Auth para /dashboard (Next 16)
 ## Ética y consideraciones legales
 
 - **Disclaimer permanente**: el agente declara no ser profesional médico.
-- **Anonimato fuerte**: SHA-256 + sal irreversible. Nunca se guarda contenido
-  del mensaje en claro.
+- **Anonimato fuerte**: SHA-256 + sal irreversible; nunca se almacena el número
+  ni se vincula la conversación a una identidad real.
+- **Memoria efímera y transparente**: el contenido de los mensajes solo se
+  guarda de forma temporal (ventana corta llaveada por el hash) para dar
+  continuidad; caduca tras 6 h de inactividad y se borra al escribir `SALIR`.
+  La bienvenida lo declara explícitamente. Sin retención indefinida.
 - **Derivación automática**: ideación suicida (Línea 113), abuso (Línea 100,
   CEM), violencia (Línea 100), emergencia médica (SAMU 106), estupro
   (DEMUNA + Línea 100).
@@ -339,6 +345,52 @@ proxy.ts                  ← Basic Auth para /dashboard (Next 16)
   estupro tipificado para relaciones con menores de 14 años.
 - **Inclusión**: lenguaje sin asunción de género ni orientación; sin
   moralización; adaptado al contexto adolescente.
+
+---
+
+## Memoria conversacional
+
+Cada usuario (identificado por su `anon_hash`) conserva una **ventana corta**
+de los últimos turnos para dar continuidad a preguntas de seguimiento
+("¿y los efectos?", "¿desde qué edad?").
+
+Flujo en `app/api/whatsapp/route.ts` (dentro de `after()`):
+
+```
+recallConversation(hash)  →  answer(body, { history })  →  sendWhatsApp  →  rememberTurn(...)
+```
+
+- **`recall`** purga turnos vencidos y devuelve los últimos N en orden
+  cronológico estable (desempate por `seq`, ya que el par de un intercambio
+  comparte `created_at`).
+- **`answer`** inyecta el historial al prompt y contextualiza la recuperación RAG
+  con el último turno del usuario (sin sumar otra llamada al LLM).
+- **`remember`** guarda el par (mensaje, respuesta) y **refresca la caducidad de
+  toda la ventana**: el reloj de inactividad se reinicia con cada mensaje.
+- **`SALIR`/`STOP`** borra la memoria del usuario de inmediato y deja un
+  *tombstone* que evita que un pipeline en vuelo re-persista lo borrado.
+
+**Purga física del contenido vencido** en dos vías: perezosa (en cada `recall`)
+y programada vía **`pg_cron` cada 15 min** (se configura solo en la migración si
+la extensión está disponible; en Supabase suele estarlo). Así el dato vencido se
+borra aunque cese el tráfico. Si `pg_cron` no está disponible, queda solo la vía
+perezosa (ver Limitaciones) o puedes añadir un Vercel Cron que ejecute
+`select public.purge_expired_memory();`.
+
+Lógica de purga/recorte/caducidad en `supabase/migrations/0002_conversation_memory.sql`
+(RPC `recall_conversation`, `remember_turns`, `forget_conversation`,
+`purge_expired_memory`).
+
+Tuning por entorno (ver `.env.example`):
+
+| Variable | Default | Significado |
+|---|---|---|
+| `MEMORY_TTL_MINUTES` | `360` | Caduca tras N min de **inactividad** (6 h). |
+| `MEMORY_MAX_TURNS` | `12` | Turnos persistidos por usuario antes de recortar. |
+| `MEMORY_RECALL_TURNS` | `8` | Turnos recientes inyectados al prompt. |
+
+Aplicar la migración (una vez): `supabase db push`, o pega el SQL en el
+**SQL Editor** de Supabase.
 
 ---
 
@@ -376,13 +428,22 @@ Disponible en `http://localhost:3000/dashboard` (Basic Auth con
 
 - WhatsApp Sandbox requiere `join <code>` por usuario; para piloto real
   conviene migrar a Meta Cloud API verificada.
-- Sin contexto multi-turno: cada mensaje se trata independientemente.
+- Memoria conversacional acotada: solo los últimos turnos dentro de la ventana
+  de inactividad; no recuerda sesiones de hace más de 6 h ni tras `SALIR`.
+- Recuperación de seguimiento sin reescritura de consulta: se contextualiza con
+  el último turno del usuario, suficiente para la mayoría de seguimientos.
+- Purga física: la caducidad **lógica** (no devolver turnos vencidos) siempre se
+  cumple. El borrado **físico** del contenido vencido lo garantiza `pg_cron`
+  (cada 15 min); si la extensión no está habilitada, el contenido vencido
+  persiste hasta el siguiente `recall` (purga perezosa). Habilita `pg_cron` o un
+  Vercel Cron para borrado garantizado independiente del tráfico.
 - La calidad de respuesta es proporcional al corpus; el seed (15 chunks) es
   apenas demostrativo.
 
 ## Roadmap post-MVP
 
-- Memoria conversacional cifrada y opt-in.
+- Cifrado en reposo del contenido de la memoria conversacional (pgcrypto).
+- Reescritura de consulta con el historial para recuperación de seguimiento.
 - Migración a Meta Cloud API verificada.
 - Detección de prompt injection y abuso del canal.
 - Evaluación humana ciega con tutores en piloto.
