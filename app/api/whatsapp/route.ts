@@ -56,7 +56,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   const normalized = body.toLowerCase();
 
   // Comandos rápidos antes de invocar el pipeline.
-  if (normalized === "salir" || normalized === "stop") {
+  // `startsWith` tolera "salir.", "salir ya", etc., para que el derecho de
+  // borrado prometido en el WELCOME no quede incumplido por la puntuación.
+  if (normalized.startsWith("salir") || normalized === "stop") {
     after(async () => {
       // SALIR cierra la sesión: borramos la memoria del usuario de inmediato.
       await forgetConversation(hash).catch(logError);
@@ -80,12 +82,22 @@ export async function POST(req: NextRequest): Promise<Response> {
       const history = await recallConversation(hash);
       const result = await answer(body, { history });
       await sendWhatsApp({ to: from, body: result.respuesta });
-      await rememberTurn({
-        anonHash: hash,
-        userMessage: body,
-        assistantMessage: result.respuesta,
-        inboundAt,
-      });
+      // Guarda de crisis: NO persistimos en claro los turnos más sensibles
+      // (ideación suicida, abuso, violencia, estupro) ni los que disparan
+      // derivación. En crisis se deriva a una línea humana, no se necesita
+      // continuidad del bot, y así no archivamos relatos de abuso/ideación.
+      const esCrisis =
+        result.triage_rule_hit ||
+        result.severidad === "alto" ||
+        result.requiere_derivacion;
+      if (!esCrisis) {
+        await rememberTurn({
+          anonHash: hash,
+          userMessage: body,
+          assistantMessage: result.respuesta,
+          inboundAt,
+        });
+      }
       await persistMetrics({
         anonHash: hash,
         inboundAt,
