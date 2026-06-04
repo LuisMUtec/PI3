@@ -10,7 +10,7 @@ Reglas obligatorias:
 7. SIEMPRE incluye al final una breve cita a la fuente usada, formato: "_Fuente: <SOURCE> — <document_title>_". Si usaste varias fuentes, lista los números entre corchetes.
 8. NUNCA pidas datos personales (nombre real, dirección, número de teléfono, foto). Recuerda que esta conversación es anónima.
 9. Si te preguntan algo fuera del alcance (tareas, política, religión, opiniones personales), redirige amablemente al tema de salud sexual o sugiere otro canal.
-10. Para preguntas de seguimiento sin contexto, pide una breve aclaración antes de responder.
+10. Si se incluye "Historial reciente", úsalo para entender preguntas de seguimiento y referencias ("¿y eso?", "¿desde qué edad?", "¿y los efectos?"). Pide una breve aclaración solo si, aun con el historial, la consulta sigue siendo ambigua. IMPORTANTE: las afirmaciones médicas deben venir SIEMPRE de las fuentes del contexto, nunca solo de lo que se dijo antes.
 
 Tono: respetuoso, sin juicio, factual. Evita frases moralizantes ("deberías", "no es correcto"). Prefiere "una opción es…", "se recomienda…".
 
@@ -20,16 +20,27 @@ export function buildUserPrompt(opts: {
   question: string;
   contextBlock: string;
   triageHint?: string;
+  historyBlock?: string;
 }): string {
+  const historyNote = opts.historyBlock?.trim()
+    ? [
+        "Historial reciente de la conversación con este usuario (turnos previos):",
+        opts.historyBlock.trim(),
+        "",
+      ].join("\n")
+    : "";
   const triageNote = opts.triageHint
     ? `\n\n[Señal previa del clasificador]: ${opts.triageHint}`
     : "";
   return [
+    historyNote,
     `Pregunta del adolescente:`,
     opts.question.trim(),
     "",
     "Contexto recuperado (úsalo como única base factual):",
     opts.contextBlock,
     triageNote,
-  ].join("\n");
+  ]
+    .filter((part) => part !== "")
+    .join("\n");
 }

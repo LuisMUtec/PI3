@@ -2,17 +2,26 @@ import { after } from "next/server";
 import type { NextRequest } from "next/server";
 import { anonHash } from "@/lib/anon/hash";
 import { answer } from "@/lib/rag/answer";
+import {
+  forgetConversation,
+  recallConversation,
+  rememberTurn,
+} from "@/lib/rag/memory";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { sendWhatsApp, validateTwilioSignature } from "@/lib/whatsapp/twilio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// El trabajo pesado corre en after() (recall + pipeline RAG + remember + envío a
+// Twilio); damos margen para que la función siga viva tras responder 200 OK.
+export const maxDuration = 60;
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>';
 
 const WELCOME =
-  "Hola 👋. Este es un canal *anónimo y gratuito* para resolver dudas sobre salud sexual y reproductiva. " +
-  "No guardamos tu número ni el contenido de tus mensajes. Escribe *SALIR* para terminar. " +
+  "Hola 👋. Canal *anónimo y gratuito* para dudas de salud sexual y reproductiva. " +
+  "No guardamos tu número (solo un código anónimo); recuerdo nuestra conversación un rato para darte " +
+  "continuidad y se borra sola tras unas horas de inactividad. Escribe *SALIR* para terminar y borrarla. " +
   "Recuerda: soy una orientación informativa, no reemplazo a un profesional de salud.";
 
 const FAREWELL =
@@ -48,7 +57,11 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // Comandos rápidos antes de invocar el pipeline.
   if (normalized === "salir" || normalized === "stop") {
-    after(() => sendWhatsApp({ to: from, body: FAREWELL }).catch(logError));
+    after(async () => {
+      // SALIR cierra la sesión: borramos la memoria del usuario de inmediato.
+      await forgetConversation(hash).catch(logError);
+      await sendWhatsApp({ to: from, body: FAREWELL }).catch(logError);
+    });
     return twimlResponse(EMPTY_TWIML);
   }
   if (
@@ -64,8 +77,15 @@ export async function POST(req: NextRequest): Promise<Response> {
   // respuesta vía API de Twilio cuando el pipeline termine.
   after(async () => {
     try {
-      const result = await answer(body);
+      const history = await recallConversation(hash);
+      const result = await answer(body, { history });
       await sendWhatsApp({ to: from, body: result.respuesta });
+      await rememberTurn({
+        anonHash: hash,
+        userMessage: body,
+        assistantMessage: result.respuesta,
+        inboundAt,
+      });
       await persistMetrics({
         anonHash: hash,
         inboundAt,
