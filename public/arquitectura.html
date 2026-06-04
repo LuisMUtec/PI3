@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flujo de un mensaje · Agente de orientación por WhatsApp</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --ink: #1a1c28;
+    --muted: #5b5f73;
+    --line: #d7dae6;
+    --card: #ffffff;
+
+    --wa: #25d366;
+    --recepcion: #2563eb;
+    --atajo: #d97706;
+    --clasifica: #7c3aed;
+    --crisis: #dc2626;
+    --rag: #0d9488;
+    --respuesta: #16a34a;
+
+    --shadow: 0 1px 2px rgba(20,22,40,.04), 0 8px 24px rgba(20,22,40,.06);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -200px, #eef1ff, var(--bg));
+    color: var(--ink);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  /* ---------- Encabezado ---------- */
+  header { text-align: center; margin-bottom: 36px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--wa); background: #e8faf0; border: 1px solid #c4f0d6;
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(28px, 4.5vw, 42px); margin: 0 0 10px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: clamp(15px, 2vw, 18px); max-width: 620px; margin: 0 auto; }
+
+  /* ---------- Ideas clave ---------- */
+  .keys {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin: 32px 0 44px;
+  }
+  .key {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; box-shadow: var(--shadow);
+  }
+  .key .ico { font-size: 26px; }
+  .key h3 { margin: 8px 0 4px; font-size: 15px; }
+  .key p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  /* ---------- Spine / flujo ---------- */
+  .flow { position: relative; }
+  .phase-label {
+    display: flex; align-items: center; gap: 12px;
+    margin: 34px 0 16px; font-weight: 700; font-size: 14px;
+    letter-spacing: .03em; text-transform: uppercase;
+  }
+  .phase-label .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .phase-label .ln { flex: 1; height: 1px; background: var(--line); }
+
+  .step {
+    position: relative;
+    display: grid; grid-template-columns: 56px 1fr; gap: 16px; align-items: stretch;
+    margin: 0 0 14px;
+  }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  .num {
+    width: 40px; height: 40px; border-radius: 12px; flex: none;
+    display: grid; place-items: center; font-weight: 700; color: #fff; font-size: 16px;
+    box-shadow: var(--shadow);
+  }
+  .pipe { flex: 1; width: 2px; background: var(--line); margin-top: 6px; }
+  .step:last-child .pipe { display: none; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow);
+    border-left: 4px solid var(--line);
+  }
+  .card h3 { margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .tech {
+    margin-top: 10px; font-size: 12px; color: #6b7088;
+    background: #f3f4fa; border: 1px dashed #d2d6e6; border-radius: 8px;
+    padding: 6px 10px; display: inline-block;
+  }
+  .tech b { color: #4a4f66; font-weight: 600; }
+
+  /* color por fase (borde izquierdo + número) */
+  .c-recepcion .card { border-left-color: var(--recepcion); }
+  .c-recepcion .num { background: var(--recepcion); }
+  .c-atajo .card { border-left-color: var(--atajo); }
+  .c-atajo .num { background: var(--atajo); }
+  .c-clasifica .card { border-left-color: var(--clasifica); }
+  .c-clasifica .num { background: var(--clasifica); }
+  .c-respuesta .card { border-left-color: var(--respuesta); }
+  .c-respuesta .num { background: var(--respuesta); }
+
+  /* ---------- Bifurcación ---------- */
+  .fork-title {
+    text-align: center; margin: 26px 0 18px; font-weight: 700; font-size: 15px; color: var(--clasifica);
+  }
+  .fork-title span { display:block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .branches { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .branch {
+    border-radius: var(--radius); padding: 4px; position: relative;
+  }
+  .branch-head {
+    text-align: center; font-weight: 700; font-size: 14px; padding: 12px 14px;
+    border-radius: 12px; color: #fff; margin-bottom: 12px;
+  }
+  .branch.crisis .branch-head { background: var(--crisis); }
+  .branch.normal .branch-head { background: var(--rag); }
+  .branch-head .small { display: block; font-weight: 500; font-size: 12px; opacity: .9; margin-top: 2px; }
+
+  .bstep {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 13px 15px; margin-bottom: 10px; box-shadow: var(--shadow);
+    border-top: 3px solid var(--line);
+  }
+  .branch.crisis .bstep { border-top-color: var(--crisis); }
+  .branch.normal .bstep { border-top-color: var(--rag); }
+  .bstep h4 { margin: 0 0 3px; font-size: 14.5px; display:flex; gap:7px; align-items:center; }
+  .bstep p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  .merge {
+    text-align: center; margin: 8px 0 4px; color: var(--muted); font-size: 13px;
+  }
+  .merge .arrow { font-size: 22px; color: var(--clasifica); display:block; line-height:1; }
+
+  /* ---------- Cierre ---------- */
+  .footer-note {
+    margin-top: 40px; background: #fff; border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .footer-note h3 { margin: 0 0 6px; font-size: 16px; }
+  .footer-note p { margin: 0; color: var(--muted); font-size: 14px; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:14px; font-size:12.5px; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .legend i { width:12px; height:12px; border-radius:3px; display:inline-block; }
+
+  @media (max-width: 700px) {
+    .keys { grid-template-columns: 1fr; }
+    .branches { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 44px 1fr; }
+    .num { width: 34px; height: 34px; font-size: 14px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .card, .key, .bstep, .footer-note { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">💬 WhatsApp · Salud sexual adolescente</div>
+    <h1>¿Qué pasa cuando alguien escribe un mensaje?</h1>
+    <p class="sub">El recorrido completo de un mensaje, desde que un/a adolescente escribe por WhatsApp hasta que recibe una respuesta confiable — paso a paso.</p>
+  </header>
+
+  <!-- Ideas clave -->
+  <section class="keys">
+    <div class="key">
+      <div class="ico">🕵️</div>
+      <h3>Anónimo</h3>
+      <p>Nunca guardamos el número de teléfono. Se convierte en un código irreversible.</p>
+    </div>
+    <div class="key">
+      <div class="ico">🛟</div>
+      <h3>Seguridad primero</h3>
+      <p>Ante una señal de peligro, se entrega ayuda humana al instante. <em>Vidas &gt; tecnología.</em></p>
+    </div>
+    <div class="key">
+      <div class="ico">📚</div>
+      <h3>Fuentes confiables</h3>
+      <p>La IA solo responde con información de MINSA, OMS y UNFPA. No inventa.</p>
+    </div>
+  </section>
+
+  <div class="flow">
+
+    <!-- FASE 1 -->
+    <div class="phase-label" style="color:var(--recepcion)">
+      <span class="dot" style="background:var(--recepcion)"></span>
+      1 · Llega el mensaje
+      <span class="ln"></span>
+    </div>
+
+    <div class="step c-recepcion">
+      <div class="rail"><div class="num">1</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>📱 El adolescente escribe</h3>
+        <p>Manda un mensaje por WhatsApp, como a cualquier contacto. No necesita instalar nada ni registrarse.</p>
+      </div>
+    </div>
+
+    <div class="step c-recepcion">
+      <div class="rail"><div class="num">2</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>☁️ Twilio lo entrega a nuestro servidor</h3>
+        <p>Twilio es el “cartero” oficial entre WhatsApp y nuestra aplicación: recibe el mensaje y nos lo reenvía.</p>
+        <span class="tech"><b>Técnico:</b> webhook <code>POST /api/whatsapp</code></span>
+      </div>
+    </div>
+
+    <div class="step c-recepcion">
+      <div class="rail"><div class="num">3</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>🔒 Comprobamos que de verdad viene de Twilio</h3>
+        <p>Verificamos una “firma” secreta. Si alguien intenta colarse haciéndose pasar por WhatsApp, se rechaza.</p>
+        <span class="tech"><b>Técnico:</b> validación de <code>X-Twilio-Signature</code> → 403 si falla</span>
+      </div>
+    </div>
+
+    <div class="step c-recepcion">
+      <div class="rail"><div class="num">4</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>🕵️ Anonimizamos a la persona</h3>
+        <p>El número de teléfono se transforma en un código único e irreversible. Sirve para hilar la conversación, pero nunca sabemos de quién es.</p>
+        <span class="tech"><b>Técnico:</b> <code>SHA-256(sal + número)</code></span>
+      </div>
+    </div>
+
+    <!-- FASE 2 -->
+    <div class="phase-label" style="color:var(--atajo)">
+      <span class="dot" style="background:var(--atajo)"></span>
+      2 · Atajos rápidos
+      <span class="ln"></span>
+    </div>
+
+    <div class="step c-atajo">
+      <div class="rail"><div class="num">5</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>⚡ ¿Es un comando especial?</h3>
+        <p><b>“Hola”</b> → mensaje de bienvenida y privacidad. &nbsp; <b>“Salir”</b> → borra todo su historial al instante. Estos no usan la IA: respuesta inmediata.</p>
+      </div>
+    </div>
+
+    <div class="step c-atajo">
+      <div class="rail"><div class="num">6</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>✅ Confirmamos recepción y seguimos por detrás</h3>
+        <p>Le decimos a Twilio “recibido” de inmediato para no hacerlo esperar, mientras el trabajo pesado (pensar la respuesta) continúa en segundo plano.</p>
+        <span class="tech"><b>Técnico:</b> responde <code>200 OK</code> y procesa en <code>after()</code></span>
+      </div>
+    </div>
+
+    <!-- FASE 3 -->
+    <div class="phase-label" style="color:var(--clasifica)">
+      <span class="dot" style="background:var(--clasifica)"></span>
+      3 · Entender y clasificar
+      <span class="ln"></span>
+    </div>
+
+    <div class="step c-clasifica">
+      <div class="rail"><div class="num">7</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>🧠 Recordamos la conversación</h3>
+        <p>Recuperamos los últimos mensajes de esa persona (anónima) para entender preguntas de seguimiento como “¿y los efectos?”. Esta memoria es temporal y se borra sola.</p>
+      </div>
+    </div>
+
+    <div class="step c-clasifica">
+      <div class="rail"><div class="num">8</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>🚦 Detector de riesgo (filtro de seguridad)</h3>
+        <p>Antes que nada, revisamos el mensaje buscando señales graves: ideas suicidas, abuso, violencia, embarazo en riesgo… Aquí el camino se divide en dos.</p>
+        <span class="tech"><b>Técnico:</b> reglas/patrones deterministas por categoría y severidad</span>
+      </div>
+    </div>
+
+    <!-- BIFURCACIÓN -->
+    <div class="fork-title">
+      ↓ ¿El mensaje muestra una señal de crisis?
+      <span>El camino cambia según la gravedad detectada</span>
+    </div>
+
+    <div class="branches">
+      <!-- Rama crisis -->
+      <div class="branch crisis">
+        <div class="branch-head">🆘 SÍ — Es una crisis
+          <span class="small">No se usa la IA · “Vidas &gt; tokens”</span>
+        </div>
+        <div class="bstep">
+          <h4>💛 Respuesta de contención</h4>
+          <p>Un mensaje preparado con cuidado: calmar → acompañar → orientar. Sin moralizar, validando lo que siente.</p>
+        </div>
+        <div class="bstep">
+          <h4>📞 Líneas de ayuda reales</h4>
+          <p>Se deriva al recurso adecuado: Línea 100, AMA 113, CEM o DEMUNA, según el caso.</p>
+        </div>
+        <div class="bstep">
+          <h4>🔐 No se archiva el relato</h4>
+          <p>Por respeto y privacidad, los mensajes de crisis no se guardan en la memoria.</p>
+        </div>
+      </div>
+
+      <!-- Rama normal -->
+      <div class="branch normal">
+        <div class="branch-head">💬 NO — Consulta informativa
+          <span class="small">Busca en fuentes y redacta con IA</span>
+        </div>
+        <div class="bstep">
+          <h4>📚 Busca en el corpus médico</h4>
+          <p>Encuentra los fragmentos de MINSA, OMS y UNFPA más parecidos a la pregunta.</p>
+          <span class="tech"><b>Técnico:</b> embeddings + similitud vectorial (pgvector)</span>
+        </div>
+        <div class="bstep">
+          <h4>🤖 La IA redacta la respuesta</h4>
+          <p>Escribe en lenguaje cercano usando <b>solo</b> esas fuentes. Si no hay info, lo dice y sugiere acudir a un centro de salud.</p>
+        </div>
+        <div class="bstep">
+          <h4>🧩 Arma el mensaje final</h4>
+          <p>Respuesta + fuentes citadas + derivación si hace falta, dentro del límite de WhatsApp.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="merge">
+      <span class="arrow">↓</span>
+      ambos caminos se reúnen para responder
+    </div>
+
+    <!-- FASE 4 -->
+    <div class="phase-label" style="color:var(--respuesta)">
+      <span class="dot" style="background:var(--respuesta)"></span>
+      4 · Responder y registrar
+      <span class="ln"></span>
+    </div>
+
+    <div class="step c-respuesta">
+      <div class="rail"><div class="num">9</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>💬 Enviamos la respuesta por WhatsApp</h3>
+        <p>La persona recibe el mensaje en su chat, como si conversara con alguien de confianza.</p>
+      </div>
+    </div>
+
+    <div class="step c-respuesta">
+      <div class="rail"><div class="num">10</div><div class="pipe"></div></div>
+      <div class="card">
+        <h3>💾 Guardamos memoria y métricas anónimas</h3>
+        <p>Si no fue crisis, se recuerda el turno para dar continuidad. Y se anotan datos <b>sin texto ni identidad</b> (cuántas consultas, de qué temas, cuánto tardó) para mejorar el servicio.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Cierre -->
+  <div class="footer-note">
+    <h3>🧭 En una frase</h3>
+    <p>Un mensaje llega <b>anónimo</b>, se revisa primero por <b>seguridad</b> (y si hay crisis, ayuda humana inmediata sin IA), y si es una duda informativa, la <b>IA responde apoyándose solo en fuentes confiables</b> — todo sin guardar quién es la persona.</p>
+    <div class="legend">
+      <span><i style="background:var(--recepcion)"></i> Recepción</span>
+      <span><i style="background:var(--atajo)"></i> Atajos</span>
+      <span><i style="background:var(--clasifica)"></i> Clasificación</span>
+      <span><i style="background:var(--crisis)"></i> Crisis</span>
+      <span><i style="background:var(--rag)"></i> Búsqueda + IA</span>
+      <span><i style="background:var(--respuesta)"></i> Respuesta</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
