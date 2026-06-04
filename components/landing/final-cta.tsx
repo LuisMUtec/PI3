@@ -27,7 +27,7 @@ export function FinalCta() {
             />
             <p className="flex items-center gap-1.5 text-sm text-primary-foreground/80">
               <Lock className="size-4" />
-              No guardamos tu número ni tus mensajes en nuestros servidores
+              Para nosotros eres anónimo: guardamos un código, no tu número
             </p>
           </div>
         </div>

@@ -26,7 +26,7 @@ export function Hero() {
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
             <Lock className="size-3.5" />
-            Anónimo, gratis y sin registros
+            Anónimo, gratis y confidencial
           </span>
 
           <h1 className="mt-5 text-balance text-4xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-5xl">

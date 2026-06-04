@@ -1,7 +1,7 @@
 import { Output, generateText } from "ai";
 import { z } from "zod";
 import { chatModel, assertAiProviderEnv } from "../ai/gateway";
-import { bloqueDerivacion } from "../triage/derivaciones";
+import { bloqueContencion, bloqueDerivacion } from "../triage/derivaciones";
 import { runTriageRules, type Severity } from "../triage/rules";
 import {
   formatChunksForPrompt,
@@ -9,6 +9,11 @@ import {
   retrieve,
   type RetrievedChunk,
 } from "./retrieve";
+import {
+  formatHistoryForPrompt,
+  lastUserTurn,
+  type ConversationTurn,
+} from "./memory";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt";
 
 const AnswerSchema = z.object({
@@ -48,19 +53,49 @@ export type AnswerResult = {
   triage_rule_hit: boolean;
 };
 
-const RESPUESTA_RIESGO_INMEDIATO =
-  "Lamento mucho que estés pasando por esto. No estás solo/a y existe ayuda disponible y gratuita ahora mismo. Por favor, contacta a una de estas líneas — son confidenciales y atendidas por profesionales:";
+const WHATSAPP_LIMIT = 1500;
 
-export async function answer(message: string): Promise<AnswerResult> {
+/**
+ * Une cuerpo + fuentes + derivación respetando el tope de WhatsApp, pero
+ * recortando SIEMPRE primero el cuerpo: las fuentes y, sobre todo, la
+ * derivación nunca se cortan en silencio. (El truncado duro de twilio.ts queda
+ * como última red de seguridad.)
+ */
+function ensamblarRespuesta(
+  body: string,
+  citas: string,
+  derivacion: string,
+  limit = WHATSAPP_LIMIT,
+): string {
+  const colas = [citas, derivacion].filter(Boolean).join("\n\n");
+  const cola = colas ? `\n\n${colas}` : "";
+  const espacio = limit - cola.length;
+  let cuerpo = body.trim();
+  if (cuerpo.length > espacio) {
+    cuerpo = espacio > 1 ? `${cuerpo.slice(0, espacio - 1).trimEnd()}…` : "";
+  }
+  return `${cuerpo}${cola}`.trimStart();
+}
+
+export type AnswerOptions = {
+  /** Ventana reciente de la conversación (orden cronológico) para dar memoria. */
+  history?: ConversationTurn[];
+};
+
+export async function answer(
+  message: string,
+  opts: AnswerOptions = {},
+): Promise<AnswerResult> {
   assertAiProviderEnv();
 
+  const history = opts.history ?? [];
   const triage = runTriageRules(message);
 
   // Atajo determinista: si una regla detectó riesgo crítico, respondemos sin
   // esperar al LLM. Vidas > tokens.
   if (triage.severity === "alto") {
     return {
-      respuesta: `${RESPUESTA_RIESGO_INMEDIATO}\n\n${bloqueDerivacion()}`,
+      respuesta: bloqueContencion(triage.category),
       severidad: "alto",
       categoria: triage.category,
       requiere_derivacion: true,
@@ -71,7 +106,15 @@ export async function answer(message: string): Promise<AnswerResult> {
     };
   }
 
-  const chunks = await retrieve(message);
+  // Contextualiza la recuperación con el último turno del usuario para que las
+  // preguntas de seguimiento ("¿y los efectos?") recuperen los chunks correctos.
+  // Mantenemos una sola llamada al LLM (sin reescritura de consulta) para no
+  // sumar latencia ni costo; el mensaje actual sigue dominando la consulta.
+  const prevUserTurn = lastUserTurn(history);
+  const retrievalQuery = prevUserTurn
+    ? `${prevUserTurn}\n${message}`
+    : message;
+  const chunks = await retrieve(retrievalQuery);
   const contextBlock = formatChunksForPrompt(chunks);
 
   const result = await generateText({
@@ -81,6 +124,7 @@ export async function answer(message: string): Promise<AnswerResult> {
     prompt: buildUserPrompt({
       question: message,
       contextBlock,
+      historyBlock: formatHistoryForPrompt(history),
       triageHint:
         triage.category !== "ninguna"
           ? `posible ${triage.category} (severidad reglas=${triage.severity})`
@@ -92,11 +136,10 @@ export async function answer(message: string): Promise<AnswerResult> {
   const obj = result.output;
 
   const citas = formatCitedSources(chunks, obj.fuentes_citadas);
-
-  const partes = [obj.respuesta];
-  if (citas) partes.push(citas);
-  if (obj.requiere_derivacion) partes.push(bloqueDerivacion());
-  const finalRespuesta = partes.join("\n\n");
+  const derivacion = obj.requiere_derivacion
+    ? bloqueDerivacion(obj.categoria)
+    : "";
+  const finalRespuesta = ensamblarRespuesta(obj.respuesta, citas, derivacion);
 
   return {
     respuesta: finalRespuesta,

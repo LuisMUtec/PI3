@@ -75,7 +75,8 @@ export function formatCitedSources(
     if (seen.has(key)) continue;
     seen.add(key);
     const label = title ? `${chunk.source} — ${title}` : chunk.source;
-    lines.push(chunk.url ? `• ${label} (${chunk.url})` : `• ${label}`);
+    // URL en línea propia (sin paréntesis) para que WhatsApp la haga clicable.
+    lines.push(chunk.url ? `• ${label}\n${chunk.url}` : `• ${label}`);
   }
   if (lines.length === 0) return "";
   return `📚 Fuentes:\n${lines.join("\n")}`;

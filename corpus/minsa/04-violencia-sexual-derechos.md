@@ -1,7 +1,7 @@
 ---
 source: MINSA
 document_title: Violencia sexual — derechos y rutas de atención
-url: https://www.gob.pe/mimp/violencia-sexual
+url: https://www.gob.pe/443-linea-100
 organismo: Ministerio de Salud y MIMP
 fecha: 2023
 ---

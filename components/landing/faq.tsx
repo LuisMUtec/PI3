@@ -13,12 +13,15 @@ type QA = {
   answer: string;
 };
 
+// Las afirmaciones de privacidad siguen el modelo honesto de
+// lib/copy/privacy.ts (fuente única): anónimo ante nosotros (código, no
+// número), WhatsApp/Twilio sí ven los mensajes, y retención temporal + SALIR.
 const faqs: QA[] = [
   {
     value: "anonimo",
     question: "¿De verdad es anónimo?",
     answer:
-      "Sí. No guardamos tu número de teléfono ni el contenido de tus mensajes en nuestros servidores; solo medimos cuántas consultas llegan, sin saber quién escribió. Eso sí, tu mensaje viaja por WhatsApp y su proveedor (Twilio) para poder responderte, según sus propias políticas de privacidad.",
+      "Para nosotros, sí: guardamos solo un código irreversible, no tu número, y no sabemos quién eres. Para darte continuidad, tu conversación se recuerda unas horas y luego se borra sola; también puedes escribir SALIR para borrarla al instante. Eso sí, WhatsApp y nuestro proveedor de mensajería (Twilio) ven tus mensajes, como en cualquier chat.",
   },
   {
     value: "costo",
@@ -36,7 +39,7 @@ const faqs: QA[] = [
     value: "privacidad",
     question: "¿Alguien más verá lo que escribo?",
     answer:
-      "No. Tu conversación es privada. Ni tus familiares, ni tu colegio, ni otras personas pueden ver lo que preguntas.",
+      "Las personas de tu entorno —tu familia, tu colegio o tus amistades— no ven lo que escribes. La conversación queda entre tú y el asistente.",
   },
   {
     value: "que-preguntar",

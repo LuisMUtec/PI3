@@ -12,7 +12,7 @@ const pillars: Pillar[] = [
     icon: ShieldCheck,
     title: "Anónimo y privado",
     description:
-      "No guardamos tu número ni tus mensajes en nuestros servidores. Tu identidad queda protegida.",
+      "Para nosotros eres anónimo: guardamos solo un código, no tu número ni tu identidad.",
   },
   {
     icon: HeartHandshake,

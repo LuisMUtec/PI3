@@ -26,7 +26,7 @@ export function SafetyHelp() {
           <ul className="mt-8 grid gap-4 sm:grid-cols-2">
             {DERIVACIONES_PRIORITARIAS.map((d) => (
               <li
-                key={d.nombre}
+                key={d.id}
                 className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
