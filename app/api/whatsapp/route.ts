@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import type { NextRequest } from "next/server";
 import { anonHash } from "@/lib/anon/hash";
+import { PRIVACY_WELCOME } from "@/lib/copy/privacy";
 import { answer } from "@/lib/rag/answer";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { sendWhatsApp, validateTwilioSignature } from "@/lib/whatsapp/twilio";
@@ -13,10 +14,9 @@ export const maxDuration = 60;
 
 const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>';
 
-const WELCOME =
-  "Hola 👋. Este es un canal *anónimo y gratuito* para resolver dudas sobre salud sexual y reproductiva. " +
-  "No guardamos tu número ni el contenido de tus mensajes. Escribe *SALIR* para terminar. " +
-  "Recuerda: soy una orientación informativa, no reemplazo a un profesional de salud.";
+// Copy de privacidad: único punto de verdad en lib/copy/privacy.ts (honesto
+// sobre las dos capas: anónimo frente a nosotros, NO frente a Twilio/Meta).
+const WELCOME = PRIVACY_WELCOME;
 
 const FAREWELL =
   "Gracias por escribir. Si necesitas ayuda urgente, llama a la *Línea 100* (100) o acude al Centro de Salud más cercano. Cuídate.";

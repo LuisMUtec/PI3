@@ -1,7 +1,7 @@
 import { Output, generateText } from "ai";
 import { z } from "zod";
 import { chatModel, assertAiProviderEnv } from "../ai/gateway";
-import { bloqueDerivacion } from "../triage/derivaciones";
+import { bloqueContencion, bloqueDerivacion } from "../triage/derivaciones";
 import { runTriageRules, type Severity } from "../triage/rules";
 import {
   formatChunksForPrompt,
@@ -48,8 +48,29 @@ export type AnswerResult = {
   triage_rule_hit: boolean;
 };
 
-const RESPUESTA_RIESGO_INMEDIATO =
-  "Lamento mucho que estés pasando por esto. No estás solo/a y existe ayuda disponible y gratuita ahora mismo. Por favor, contacta a una de estas líneas — son confidenciales y atendidas por profesionales:";
+const WHATSAPP_LIMIT = 1500;
+
+/**
+ * Une cuerpo + fuentes + derivación respetando el tope de WhatsApp, pero
+ * recortando SIEMPRE primero el cuerpo: las fuentes y, sobre todo, la
+ * derivación nunca se cortan en silencio. (El truncado duro de twilio.ts queda
+ * como última red de seguridad.)
+ */
+function ensamblarRespuesta(
+  body: string,
+  citas: string,
+  derivacion: string,
+  limit = WHATSAPP_LIMIT,
+): string {
+  const colas = [citas, derivacion].filter(Boolean).join("\n\n");
+  const cola = colas ? `\n\n${colas}` : "";
+  const espacio = limit - cola.length;
+  let cuerpo = body.trim();
+  if (cuerpo.length > espacio) {
+    cuerpo = espacio > 1 ? `${cuerpo.slice(0, espacio - 1).trimEnd()}…` : "";
+  }
+  return `${cuerpo}${cola}`.trimStart();
+}
 
 export async function answer(message: string): Promise<AnswerResult> {
   assertAiProviderEnv();
@@ -60,7 +81,7 @@ export async function answer(message: string): Promise<AnswerResult> {
   // esperar al LLM. Vidas > tokens.
   if (triage.severity === "alto") {
     return {
-      respuesta: `${RESPUESTA_RIESGO_INMEDIATO}\n\n${bloqueDerivacion()}`,
+      respuesta: bloqueContencion(triage.category),
       severidad: "alto",
       categoria: triage.category,
       requiere_derivacion: true,
@@ -92,11 +113,10 @@ export async function answer(message: string): Promise<AnswerResult> {
   const obj = result.output;
 
   const citas = formatCitedSources(chunks, obj.fuentes_citadas);
-
-  const partes = [obj.respuesta];
-  if (citas) partes.push(citas);
-  if (obj.requiere_derivacion) partes.push(bloqueDerivacion());
-  const finalRespuesta = partes.join("\n\n");
+  const derivacion = obj.requiere_derivacion
+    ? bloqueDerivacion(obj.categoria)
+    : "";
+  const finalRespuesta = ensamblarRespuesta(obj.respuesta, citas, derivacion);
 
   return {
     respuesta: finalRespuesta,
