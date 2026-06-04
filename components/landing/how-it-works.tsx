@@ -74,6 +74,19 @@ export function HowItWorks() {
         <div className="mt-10 flex justify-center">
           <WhatsappCta label="Empezar ahora" />
         </div>
+
+        <div className="flex flex-col items-center text-center p-6 bg-slate-50 rounded-xl border border-slate-100">
+  <p className="text-sm font-medium text-slate-600 max-w-xs">
+    O escanea el código QR con tu celular para abrir el chat directamente:
+  </p>
+  <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm transition-transform hover:scale-105 duration-300">
+    <img
+      src="/qrcode.png"
+      alt="Código QR de enlace al chat de WhatsApp"
+      className="h-40 w-40 object-contain"
+    />
+  </div>
+</div>
       </div>
     </section>
   );
