@@ -3,7 +3,7 @@
  *
  * Configuración por variables de entorno públicas (visibles en el cliente):
  *   NEXT_PUBLIC_WHATSAPP_NUMBER    número en formato internacional, p. ej. "14155238886"
- *   NEXT_PUBLIC_WHATSAPP_JOIN_CODE código del sandbox, p. ej. "join dos-palabras"
+ *   NEXT_PUBLIC_WHATSAPP_JOIN_CODE código del sandbox, p. ej. "join advice-time"
  *
  * Si no hay variables definidas usa el número compartido del sandbox de Twilio
  * para que la build de preview no rompa.
