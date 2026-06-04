@@ -5,7 +5,6 @@ import { bloqueContencion, bloqueDerivacion } from "../triage/derivaciones";
 import { runTriageRules, type Severity } from "../triage/rules";
 import {
   formatChunksForPrompt,
-  formatCitedSources,
   retrieve,
   type RetrievedChunk,
 } from "./retrieve";
@@ -21,7 +20,7 @@ const AnswerSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Texto que se enviará al adolescente por WhatsApp. 3–6 oraciones, español neutro PE, sin moralizar.",
+      "Texto que se enviará al adolescente por WhatsApp. 2–3 oraciones, español neutro PE, sin moralizar.",
     ),
   severidad: z
     .enum(["bajo", "medio", "alto"])
@@ -56,19 +55,16 @@ export type AnswerResult = {
 const WHATSAPP_LIMIT = 1500;
 
 /**
- * Une cuerpo + fuentes + derivación respetando el tope de WhatsApp, pero
- * recortando SIEMPRE primero el cuerpo: las fuentes y, sobre todo, la
- * derivación nunca se cortan en silencio. (El truncado duro de twilio.ts queda
- * como última red de seguridad.)
+ * Une cuerpo + derivación respetando el tope de WhatsApp, pero recortando
+ * SIEMPRE primero el cuerpo: la derivación nunca se corta en silencio. (El
+ * truncado duro de twilio.ts queda como última red de seguridad.)
  */
 function ensamblarRespuesta(
   body: string,
-  citas: string,
   derivacion: string,
   limit = WHATSAPP_LIMIT,
 ): string {
-  const colas = [citas, derivacion].filter(Boolean).join("\n\n");
-  const cola = colas ? `\n\n${colas}` : "";
+  const cola = derivacion ? `\n\n${derivacion}` : "";
   const espacio = limit - cola.length;
   let cuerpo = body.trim();
   if (cuerpo.length > espacio) {
@@ -135,11 +131,10 @@ export async function answer(
 
   const obj = result.output;
 
-  const citas = formatCitedSources(chunks, obj.fuentes_citadas);
   const derivacion = obj.requiere_derivacion
     ? bloqueDerivacion(obj.categoria)
     : "";
-  const finalRespuesta = ensamblarRespuesta(obj.respuesta, citas, derivacion);
+  const finalRespuesta = ensamblarRespuesta(obj.respuesta, derivacion);
 
   return {
     respuesta: finalRespuesta,
